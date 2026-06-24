@@ -26,9 +26,28 @@ cypy is a powerful, minimal, and cross-platform command-line (CLI) manga transla
   - `Komika Axis.ttf` (Manga-styled font)
 - **Google Gemini API Key:** You will need an API key to access the Gemini translation gate.
 
-## Installation
+## Installation & Setup
 
-cypy is structured as a standard Python package. It is highly recommended to install it inside a Python virtual environment to keep dependencies isolated and manage your environment cleanly.
+You can either download the pre-built standalone binaries or set up the project from source.
+
+### Option 1: Standalone Release (Recommended for Users)
+
+Download the latest pre-compiled package for your OS (Windows, Linux, macOS) from the [Releases](https://github.com/indravoyager/cypy/releases) page.
+
+1. Download and extract the `.zip` file for your platform.
+2. Create a `.env` file in the extracted directory (or rename `.env.example` to `.env`) and add your `GEMINI_API_KEY`:
+   ```env
+   GEMINI_API_KEY=your_api_key_here
+   ```
+3. Run the executable:
+   - **Windows:** Double-click `cypy.exe` or run `cypy.exe` in CMD/PowerShell.
+   - **Linux / macOS:** Open a terminal, make it executable (`chmod +x cypy`), and run `./cypy`.
+
+---
+
+### Option 2: Installation from Source (For Developers)
+
+cypy is structured as a standard Python package. It is recommended to install it inside a Python virtual environment to keep dependencies isolated.
 
 1. **Clone the repository:**
    ```bash

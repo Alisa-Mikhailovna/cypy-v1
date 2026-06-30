@@ -623,7 +623,7 @@ def mulai_ritual_archive(archive_path, yolo_model, provider, target_language="In
         return
         
     if is_rar:
-        print("[Info] Input is .cbr/.rar. Output will be saved as .cbz for best compatibility.")
+        print("[Info] Archive detected. Output will be saved as .pdf")
 
     temp_dir = os.path.join(ROOT_DIR, "cypy_cache", f"archive_temp_{uuid.uuid4().hex[:8]}")
     os.makedirs(temp_dir, exist_ok=True)
@@ -678,19 +678,14 @@ def mulai_ritual_archive(archive_path, yolo_model, provider, target_language="In
         for future in concurrent.futures.as_completed(futures):
             translated_paths.append(future.result())
             
-    # Repack
-    ext = archive_path.rsplit(".", 1)[-1].lower()
-    out_ext = "zip" if ext == "zip" else "cbz"
-    
-    output_arch_path = archive_path.rsplit(".", 1)[0] + f"{suffix}.{out_ext}"
-    print(f"\nRepacking translated images into {out_ext.upper()}...")
-    with zipfile.ZipFile(output_arch_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for p in translated_paths:
-            if p and os.path.exists(p):
-                # keep relative path inside zip
-                arcname = os.path.relpath(p, temp_dir)
-                zf.write(p, arcname)
+    # Repack into PDF
+    valid_paths = [p for p in translated_paths if p and os.path.exists(p)]
+    if valid_paths:
+        output_pdf_path = archive_path.rsplit(".", 1)[0] + f"{suffix}.pdf"
+        print(f"\nCombining translated images into PDF...")
+        images = [Image.open(img).convert("RGB") for img in valid_paths]
+        images[0].save(output_pdf_path, save_all=True, append_images=images[1:])
+        print(f"Done! Saved at: {output_pdf_path}")
                 
-    print(f"Done! Saved at: {output_arch_path}")
     shutil.rmtree(temp_dir, ignore_errors=True)
 

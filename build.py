@@ -134,6 +134,7 @@ def run_build():
         "--nofollow-import-to=ultralytics",
         "--assume-yes-for-downloads",
         "--show-progress",
+        "--jobs=1",
     ]
 
     curr_system = platform.system().lower()

@@ -27,6 +27,8 @@ REQUIRED_DEPS = {
     "nuitka",
     "ordered-set"
 }
+if platform.system().lower() == "darwin":
+    REQUIRED_DEPS.add("imageio")
 
 EXTRA_FILES = {
     ROOT_DIR / "README.md",

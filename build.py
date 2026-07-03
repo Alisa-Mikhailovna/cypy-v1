@@ -148,6 +148,12 @@ def run_build():
 
     if curr_system == "windows":
         cmd.append("--mingw64")  # GCC handles large C files better than MSVC
+        # Reduce GCC peak memory for massive generated C files (e.g. google.genai.types)
+        cmd.extend([
+            "--c-compiler-option=-Os",
+            "--c-compiler-option=--param=ggc-min-heapsize=1024",
+            "--c-compiler-option=--param=ggc-min-expand=1",
+        ])
         cmd.extend([
             f"--windows-icon-from-ico={ICON_PATH}" if is_favicon_exist else ''
         ])

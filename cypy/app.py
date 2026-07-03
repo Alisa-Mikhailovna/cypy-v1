@@ -6,7 +6,7 @@ import cypy.core.config as config
 from cypy.core.translator import proses_satu_gambar, mulai_ritual_pdf, proses_folder, mulai_ritual_archive
 from cypy.core.providers import create_provider
 from cypy.core.utils import create_shortcut_if_first_run
-from cypy.core import theme
+from cypy.core import ui
 from cypy import __version__
 
 
@@ -58,7 +58,7 @@ def pilih_bahasa():
         "[7] Javanese (Basa Jawa)",
         "[8] Custom (type your own)",
     ]
-    theme.print_box("Target Language / Bahasa Target:", options, col_width=28)
+    ui.print_box("Target Language / Bahasa Target:", options, col_width=28)
 
     lang_choice = input("Select choice / Pilih (1-8) [Default: 2]: ").strip()
     if lang_choice == "1":
@@ -96,7 +96,7 @@ def pilih_provider():
         "[4] OpenRouter",
         "[5] Custom (OpenAI-compatible)",
     ]
-    theme.print_box("API Provider Selection:", options, col_width=28)
+    ui.print_box("API Provider Selection:", options, col_width=28)
 
     choice = input("Select provider (1-5) [Default: 1]: ").strip()
     if choice == "2":
@@ -354,11 +354,11 @@ def menu_tweak():
                 print(f"  [!] Nilai harus berupa tipe {meta['type']}")
 
 def tampilkan_help():
-    theme.tampilkan_help()
+    ui.tampilkan_help()
 
 
 def tampilkan_status(provider, target_language):
-    theme.tampilkan_status(provider, target_language)
+    ui.tampilkan_status(provider, target_language)
 
 
 def main():
@@ -369,7 +369,7 @@ def main():
     if config.load_local_profile():
         print("\n[+] Loaded local profile (cypy_profile.json)")
 
-    theme.print_logo(__version__)
+    ui.print_logo(__version__)
 
     env_path = os.path.join(config.ROOT_DIR, ".env")
     has_provider = _env_has_key(env_path, "LLM_PROVIDER")

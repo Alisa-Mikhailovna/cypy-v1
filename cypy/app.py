@@ -401,7 +401,7 @@ def main():
     # Show current config
     tampilkan_status(provider, target_language)
 
-    print("\nReady! Drag-and-drop files or folders to translate. Type 'help' for commands.")
+    print("Ready! Drag-and-drop files or folders to translate. Type 'help' for commands.")
 
     while True:
         try:

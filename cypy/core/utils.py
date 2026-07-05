@@ -865,11 +865,16 @@ def buang_kotak_sfx_dan_gambar(img, boxes, image_name="image"):
 
         gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
 
-        black_ratio = float(np.mean(gray < 80))
-        white_ratio = float(np.mean(gray > 220))
+        # Use OpenCV threshold + countNonZero to avoid allocating
+        # intermediate boolean numpy arrays on each iteration.
+        _, black_mask = cv2.threshold(gray, 79, 255, cv2.THRESH_BINARY_INV)
+        black_ratio = float(cv2.countNonZero(black_mask) / float(gray.size))
+
+        _, white_mask = cv2.threshold(gray, 220, 255, cv2.THRESH_BINARY)
+        white_ratio = float(cv2.countNonZero(white_mask) / float(gray.size))
 
         edges = cv2.Canny(gray, 80, 160)
-        edge_ratio = float(np.mean(edges > 0))
+        edge_ratio = float(cv2.countNonZero(edges) / float(gray.size))
 
         # If mostly white, it's likely a speech bubble! We'll keep it~
         if white_ratio >= white_safe:

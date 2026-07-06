@@ -25,6 +25,29 @@ from cypy.core.utils import (
 )
 
 
+def _get_lang_code(target_language):
+    """Get language code from target language name."""
+    return config.LANG_CODES.get(target_language.lower(), target_language[:2].lower() if target_language else "tr")
+
+
+def _make_output_path(input_path, target_language, output_ext=".png"):
+    """Generate output path with language-code subfolder.
+    
+    Example: manga/page1.png -> manga/ID/page1.png
+    """
+    lang_code = _get_lang_code(target_language)
+    lang_code_upper = lang_code.upper()
+    
+    dir_name = os.path.dirname(input_path)
+    base_name = os.path.basename(input_path)
+    name_without_ext = os.path.splitext(base_name)[0]
+    
+    output_dir = os.path.join(dir_name, lang_code_upper)
+    os.makedirs(output_dir, exist_ok=True)
+    
+    return os.path.join(output_dir, f"{name_without_ext}{output_ext}")
+
+
 yolo_lock = threading.Lock()
 
 def terjemahkan_mosaik(gambar_mosaik_pil, provider, target_language="Indonesian", max_retry=3):
@@ -72,11 +95,28 @@ def terjemahkan_mosaik(gambar_mosaik_pil, provider, target_language="Indonesian"
                 "8. If unsure about some text, use [?] for that part. \n"
                 "9. If the bubble only contains SFX, scribbles, is empty, or is background art and not a meaningful dialogue, reply with 'SKIP'. \n\n"
 
+                "HONORIFICS RULE:\n"
+                "1. If the original text contains Japanese honorifics (san, kun, chan, sama, senpai, sensei, etc.), "
+                "keep them as-is in the translation. Do NOT translate honorifics. \n"
+                "2. Examples: -san stays as -san, -kun stays as -kun, -chan stays as -chan. \n"
+                "3. This applies even when translating to non-Japanese languages. \n\n"
+
+                "SFX RULE:\n"
+                "1. If a bubble contains ONLY sound effects (SFX) with no dialogue, reply with 'SKIP'. \n"
+                "2. SFX examples: ドドド, ゴゴゴ, バキ, ギュウ, キラキラ, etc. \n"
+                "3. If a bubble has BOTH dialogue and SFX, translate only the dialogue part. \n\n"
+
+                "RETURN ALL IDs RULE:\n"
+                "1. You MUST return a JSON entry for EVERY red ID number visible in the image. \n"
+                "2. Do NOT skip any ID numbers. If ID 1, 2, 3, 4, 5 are visible, your JSON must contain all 5 keys. \n"
+                "3. For IDs you cannot read or translate, use 'SKIP' as the value. \n"
+                "4. This is critical - missing IDs will cause errors. \n\n"
+
                 "OUTPUT FORMAT:\n"
                 "Provide the response ONLY in valid JSON without markdown formatting. \n"
                 "Keys must be the red ID numbers as strings. \n"
-                f"Values must be the {target_language} translation. \n"
-                f'Example output: {{"1": "{example_val_1}", "2": "SKIP", "3": "{example_val_3}"}}'
+                f"Values must be the {target_language} translation or 'SKIP'. \n"
+                f'Example output: {{"1": "{example_val_1}", "2": "SKIP", "3": "{example_val_3}", "4": "SKIP", "5": "{example_val_1}"}}'
             )
 
             response_text = provider.translate_image(gambar_mosaik_pil, prompt)
@@ -209,9 +249,7 @@ def proses_satu_gambar(image_path, yolo_model, provider, target_language="Indone
             
             combined = cv2.hconcat(img_results)
             
-            lang_code = config.LANG_CODES.get(target_language.lower(), target_language[:2].lower() if target_language else "tr")
-            suffix = f"_cypytr_{lang_code}"
-            output_path = image_path.rsplit(".", 1)[0] + f"{suffix}.png"
+            output_path = _make_output_path(image_path, target_language)
             
             cv2.imwrite(output_path, combined)
             
@@ -231,9 +269,6 @@ def _proses_satu_gambar_core(image_path, yolo_model, provider, target_language="
     """Core processing function for a single manga page~ ♪"""
 
     print(f"\nTranslating: {os.path.basename(image_path)}")
-
-    lang_code = config.LANG_CODES.get(target_language.lower(), target_language[:2].lower() if target_language else "tr")
-    suffix = f"_cypytr_{lang_code}"
 
     img = cv2.imdecode(np.fromfile(image_path, dtype=np.uint8), cv2.IMREAD_COLOR)
 
@@ -331,7 +366,7 @@ def _proses_satu_gambar_core(image_path, yolo_model, provider, target_language="
     if total_balon == 0:
         print("  No text bubbles found.")
 
-        output_path = image_path.rsplit(".", 1)[0] + f"{suffix}.png"
+        output_path = _make_output_path(image_path, target_language)
         img_pil_utama.save(output_path)
 
         return output_path
@@ -481,7 +516,7 @@ def _proses_satu_gambar_core(image_path, yolo_model, provider, target_language="
                         target_language=target_language
                     )
 
-    output_path = image_path.rsplit(".", 1)[0] + f"{suffix}.png"
+    output_path = _make_output_path(image_path, target_language)
 
     img_pil_utama.save(output_path)
 
@@ -510,9 +545,7 @@ def proses_folder(folder_path, yolo_model, provider, target_language="Indonesian
         file_path = os.path.join(folder_path, filename)
         
         # Resume Check
-        lang_code = config.LANG_CODES.get(target_language.lower(), target_language[:2].lower() if target_language else "tr")
-        suffix = f"_cypytr_{lang_code}"
-        expected_output = file_path.rsplit(".", 1)[0] + f"{suffix}.png"
+        expected_output = _make_output_path(file_path, target_language)
         
         if os.path.exists(expected_output):
             print(f"\n[{idx}/{total}] Skipping {filename} (Already translated).")
@@ -537,9 +570,6 @@ def mulai_ritual_pdf(pdf_path, yolo_model, provider, target_language="Indonesian
     """Processes a PDF page-by-page concurrently, and binds them back together."""
     print(f"\nProcessing PDF: {os.path.basename(pdf_path)}")
 
-    lang_code = config.LANG_CODES.get(target_language.lower(), "tr")
-    suffix = f"_cypytr_{lang_code}"
-
     doc = fitz.open(pdf_path)
 
     temp_dir = os.path.join(config.ROOT_DIR, "cypy_cache", f"pdf_temp_{uuid.uuid4().hex[:8]}")
@@ -559,7 +589,7 @@ def mulai_ritual_pdf(pdf_path, yolo_model, provider, target_language="Indonesian
         page_paths.append((page_num, img_path))
         
     def process_pdf_page(page_num, img_path):
-        expected_output = img_path.rsplit(".", 1)[0] + f"{suffix}.png"
+        expected_output = _make_output_path(img_path, target_language)
         if os.path.exists(expected_output):
             print(f"\n[PDF {page_num + 1}/{total_pages}] Skipping (Already translated).")
             return page_num, expected_output
@@ -579,7 +609,7 @@ def mulai_ritual_pdf(pdf_path, yolo_model, provider, target_language="Indonesian
     if valid_paths:
         print("Saving final PDF...")
         images = [Image.open(img).convert("RGB") for img in valid_paths]
-        output_pdf_path = pdf_path.rsplit(".", 1)[0] + f"{suffix}.pdf"
+        output_pdf_path = _make_output_path(pdf_path, target_language, output_ext=".pdf")
         images[0].save(output_pdf_path, save_all=True, append_images=images[1:])
         print(f"Done! Saved at: {output_pdf_path}")
 
@@ -670,13 +700,10 @@ def mulai_ritual_archive(archive_path, yolo_model, provider, target_language="In
         
     print(f"Found {total} images. Starting translation...")
     
-    lang_code = config.LANG_CODES.get(target_language.lower(), target_language[:2].lower() if target_language else "tr")
-    suffix = f"_cypytr_{lang_code}"
-    
     translated_paths = []
 
     def process_arch_file(img_path, idx):
-        expected_output = img_path.rsplit(".", 1)[0] + f"{suffix}.png"
+        expected_output = _make_output_path(img_path, target_language)
         if os.path.exists(expected_output):
             print(f"\n[{idx}/{total}] Skipping (Already translated).")
             return expected_output
@@ -693,7 +720,7 @@ def mulai_ritual_archive(archive_path, yolo_model, provider, target_language="In
     # Repack into PDF
     valid_paths = [p for p in translated_paths if p and os.path.exists(p)]
     if valid_paths:
-        output_pdf_path = archive_path.rsplit(".", 1)[0] + f"{suffix}.pdf"
+        output_pdf_path = _make_output_path(archive_path, target_language, output_ext=".pdf")
         print(f"\nCombining translated images into PDF...")
         images = [Image.open(img).convert("RGB") for img in valid_paths]
         images[0].save(output_pdf_path, save_all=True, append_images=images[1:])

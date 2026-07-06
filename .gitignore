@@ -5,6 +5,7 @@ __pycache__/
 
 # Temporary Manga Translation files
 cypy_cache/
+test/
 
 # Data & Config files
 cypy_profile.json

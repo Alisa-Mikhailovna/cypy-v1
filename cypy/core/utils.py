@@ -441,7 +441,7 @@ def pilih_setting_teks(box_width, box_height, text):
             "font_scale": 0.95,
             "spacing_ratio": 0.055,
             "max_font": 86,
-            "min_font": 7,
+            "min_font": 10,
         }
 
     if balon_besar and teks_pendek:
@@ -451,7 +451,7 @@ def pilih_setting_teks(box_width, box_height, text):
             "font_scale": 0.94,
             "spacing_ratio": 0.060,
             "max_font": 82,
-            "min_font": 7,
+            "min_font": 10,
         }
 
     return {
@@ -460,7 +460,7 @@ def pilih_setting_teks(box_width, box_height, text):
         "font_scale": 0.92,
         "spacing_ratio": 0.075,
         "max_font": 76,
-        "min_font": 6,
+        "min_font": 8,
     }
 
 
@@ -599,7 +599,7 @@ def tulis_teks_di_balon(draw, text, x1, y1, x2, y2, background_patch=False, targ
     best_score = -1
 
     # Looking for the largest font size that fits~
-    # Selecting the layout that fills the bubble most beautifully ♪
+    # If no size fits perfectly, use the largest size that mostly fits
     for f_size in range(max_font_size, min_font_size - 1, -1):
         font = _get_font_for_text(text, f_size, target_language)
 
@@ -610,6 +610,7 @@ def tulis_teks_di_balon(draw, text, x1, y1, x2, y2, background_patch=False, targ
         tw = bbox[2] - bbox[0]
         th = bbox[3] - bbox[1]
 
+        # Perfect fit - text fits completely
         if tw <= max_w and th <= max_h:
             isi_w = tw / max(1, max_w)
             isi_h = th / max(1, max_h)
@@ -623,6 +624,21 @@ def tulis_teks_di_balon(draw, text, x1, y1, x2, y2, background_patch=False, targ
 
             # Since we search largest to smallest, the first match is usually the best~
             break
+        
+        # Partial fit - text slightly overflows but font is much bigger
+        # Allow up to 15% overflow if font size is 2x larger than current best
+        elif f_size > best_font_size * 1.5:
+            overflow_ratio = max(tw / max(1, max_w), th / max(1, max_h))
+            if overflow_ratio <= 1.15:  # 15% overflow allowed
+                isi_w = tw / max(1, max_w)
+                isi_h = th / max(1, max_h)
+                score = (f_size * 10) + (isi_w + isi_h) - (overflow_ratio * 50)
+
+                if score > best_score:
+                    best_score = score
+                    best_font_size = f_size
+                    best_wrap = wrapped_text
+                    best_spacing = spacing
 
     # Don't shrink font size too much for big bubbles with short text~
     best_font_size = max(min_font_size, int(best_font_size * setting["font_scale"]))

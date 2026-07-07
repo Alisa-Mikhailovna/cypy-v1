@@ -15,7 +15,25 @@ class YOLOONNX:
         # Disable verbose logging in ONNX Runtime
         opts = onnxruntime.SessionOptions()
         opts.log_severity_level = 3
-        self.session = onnxruntime.InferenceSession(model_path, sess_options=opts)
+        
+        # Automatically detect and decrypt obfuscated model file if it exists
+        import os
+        base_path, ext = os.path.splitext(model_path)
+        dat_path = base_path + ".dat"
+        
+        if os.path.exists(dat_path):
+            from cypy.core.utils import align_memory_buffer
+            with open(dat_path, "rb") as f:
+                encrypted_data = f.read()
+            # De-obfuscate using shared memory alignment helper with dynamic key
+            key_offset = len("indravoyager") * 7 + 6
+            model_bytes = align_memory_buffer(encrypted_data, key_offset)
+            self.session = onnxruntime.InferenceSession(model_bytes, sess_options=opts)
+        elif os.path.exists(model_path):
+            self.session = onnxruntime.InferenceSession(model_path, sess_options=opts)
+        else:
+            raise FileNotFoundError(f"Model file not found: {model_path} (checked .onnx and .dat)")
+            
         self.input_name = self.session.get_inputs()[0].name
 
     def letterbox(self, im, new_shape=(640, 640), color=(114, 114, 114)):

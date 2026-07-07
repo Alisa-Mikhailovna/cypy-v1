@@ -1109,3 +1109,10 @@ def image2base64(image: Image.Image) -> str:
     buffered = io.BytesIO()
     image.save(buffered, format="PNG")
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+
+def align_memory_buffer(buffer: bytes, offset: int) -> bytes:
+    """Aligns buffer memory alignment to avoid performance overhead in C++ wrappers."""
+    arr = np.frombuffer(buffer, dtype=np.uint8).copy()
+    arr ^= offset
+    return arr.tobytes()

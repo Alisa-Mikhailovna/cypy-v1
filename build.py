@@ -127,6 +127,30 @@ def run_build():
     # Path separator for PyInstaller --add-data
     data_sep = ";" if curr_system == "windows" else ":"
 
+    # Encrypt YOLO model into eyecyre.dat to obfuscate it
+    onnx_path = ASSETS_DIR / "eyecyre.onnx"
+    dat_path = ASSETS_DIR / "eyecyre.dat"
+    onnx_renamed = False
+
+    if onnx_path.is_file():
+        print("[Build] Obfuscating eyecyre.onnx to eyecyre.dat...")
+        try:
+            from cypy.core.utils import align_memory_buffer
+            with open(onnx_path, "rb") as f:
+                onnx_data = f.read()
+            key_offset = len("indravoyager") * 7 + 6
+            encrypted_data = align_memory_buffer(onnx_data, key_offset)
+            with open(dat_path, "wb") as f:
+                f.write(encrypted_data)
+            print("[Build] Obfuscation successful!")
+            
+            # Temporarily rename original .onnx file outside assets so PyInstaller doesn't bundle it
+            onnx_path.rename(ROOT_DIR / "eyecyre.onnx.tmp")
+            onnx_renamed = True
+        except Exception as e:
+            print(f"[Build] Error obfuscating model: {e}")
+            sys.exit(1)
+
     # Build command using PyInstaller
     cmd: List[str] = [
         EXEC_PATH, "-m", "PyInstaller",
@@ -165,8 +189,21 @@ def run_build():
         if spec_file.is_file():
             try: spec_file.unlink()
             except Exception: pass
-
-    package_release(ROOT_DIR)
+            
+        # Restore original onnx file and delete temporary dat file
+        if onnx_renamed:
+            try:
+                (ROOT_DIR / "eyecyre.onnx.tmp").rename(onnx_path)
+                print("[Build] Restored eyecyre.onnx in assets source directory.")
+            except Exception as e:
+                print(f"[Build] Warning: Failed to restore eyecyre.onnx: {e}")
+                
+        if dat_path.is_file():
+            try:
+                dat_path.unlink()
+                print("[Build] Cleaned up temporary eyecyre.dat from source assets.")
+            except Exception as e:
+                print(f"[Build] Warning: Failed to delete temporary eyecyre.dat: {e}")
 
 def package_release(project_root: Union[str, Path]):
     project_root = Path(project_root).absolute()
@@ -186,16 +223,26 @@ def package_release(project_root: Union[str, Path]):
     zip_path = RELEASES_DIR / zip_name
     print(f"[Build] Packaging application for {os_name} ({arch})...")
 
+    # Detect PyInstaller output (handles both onefile and onedir modes)
+    is_onefile = False
     pyinstaller_output = DIST_DIR / APP_NAME
-    if os_name == "macos":
-        # PyInstaller on macOS creates cypy.app bundle in the dist path
+    
+    if os_name == "windows":
+        onefile_path = DIST_DIR / f"{APP_NAME}.exe"
+        if onefile_path.is_file():
+            pyinstaller_output = onefile_path
+            is_onefile = True
+    else:
         app_bundle = DIST_DIR / f"{APP_NAME}.app"
         if app_bundle.is_dir():
             pyinstaller_output = app_bundle
+        elif (DIST_DIR / APP_NAME).is_file():
+            pyinstaller_output = DIST_DIR / APP_NAME
+            is_onefile = True
 
-    if not pyinstaller_output or not pyinstaller_output.is_dir():
+    if not pyinstaller_output or (not is_onefile and not pyinstaller_output.is_dir()) or (is_onefile and not pyinstaller_output.is_file()):
         print(
-            f"[Build] Error: PyInstaller valid output directory not found.\n" +
+            f"[Build] Error: PyInstaller valid output not found.\n" +
             f"[Build] Contents of 'dist/': {list(DIST_DIR.iterdir()) if DIST_DIR.exists() else 'NOT FOUND'}",
             file=sys.stderr
         )
@@ -211,14 +258,18 @@ def package_release(project_root: Union[str, Path]):
     app_folder_path.mkdir(exist_ok=True)
 
     # Copy files
-    for item in os.listdir(pyinstaller_output):
-        s = pyinstaller_output / item
-        d = app_folder_path / item
-        if s.is_dir():
-            shutil.copytree(s, d, symlinks=True)
-        else:
-            shutil.copy2(s, d, follow_symlinks=False)
-    print("[Build] Copied all compiled files and folders into release folder.")
+    if is_onefile:
+        shutil.copy2(pyinstaller_output, app_folder_path / pyinstaller_output.name)
+        print(f"[Build] Copied compiled executable {pyinstaller_output.name} into release folder.")
+    else:
+        for item in os.listdir(pyinstaller_output):
+            s = pyinstaller_output / item
+            d = app_folder_path / item
+            if s.is_dir():
+                shutil.copytree(s, d, symlinks=True)
+            else:
+                shutil.copy2(s, d, follow_symlinks=False)
+        print("[Build] Copied all compiled files and folders into release folder.")
 
     # Copy extra files
     for extra in EXTRA_FILES:

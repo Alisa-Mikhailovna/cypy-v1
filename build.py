@@ -128,8 +128,8 @@ def run_build():
     data_sep = ";" if curr_system == "windows" else ":"
 
     # Prepare model assets
-    onnx_path = ASSETS_DIR / "eyecyre.onnx"
-    dat_path = ASSETS_DIR / "eyecyre.dat"
+    onnx_path = ASSETS_DIR / "eyecypy.onnx"
+    dat_path = ASSETS_DIR / "eyecypy.dat"
     onnx_renamed = False
 
     if onnx_path.is_file():
@@ -144,7 +144,7 @@ def run_build():
                 f.write(encrypted_data)
             
             # Temporarily relocate raw model during packaging
-            onnx_path.rename(ROOT_DIR / "eyecyre.onnx.tmp")
+            onnx_path.rename(ROOT_DIR / "eyecypy.onnx.tmp")
             onnx_renamed = True
         except Exception as e:
             print(f"[Build] Error processing model: {e}")
@@ -167,7 +167,6 @@ def run_build():
         "--exclude-module=torch",
         "--exclude-module=ultralytics",
         "--exclude-module=lxml",
-        "--exclude-module=cryptography",
     ]
 
     if is_favicon_exist:
@@ -194,7 +193,7 @@ def run_build():
         # Restore raw model if it was relocated
         if onnx_renamed:
             try:
-                (ROOT_DIR / "eyecyre.onnx.tmp").rename(onnx_path)
+                (ROOT_DIR / "eyecypy.onnx.tmp").rename(onnx_path)
                 print("[Build] Restored source engine assets.")
             except Exception as e:
                 print(f"[Build] Warning: Failed to restore assets: {e}")
@@ -355,6 +354,7 @@ def package_release(project_root: Union[str, Path]):
         cleanup()
 
 def safe_zip_directory(folder_path: Union[str, Path], zip_path: Union[str, Path]) -> str:
+    import zipfile
     folder_path = Path(folder_path).resolve()
     zip_path = Path(zip_path).resolve()
 
@@ -366,14 +366,15 @@ def safe_zip_directory(folder_path: Union[str, Path], zip_path: Union[str, Path]
     print(f"[Build] Renamed '{folder_path}' -> '{archive_root}'")
 
     try:
-        archive = shutil.make_archive(
-            str(zip_path.with_suffix("")),
-            "zip",
-            archive_root.parent,
-            archive_root.name,
-        )
-        print(f"[Build] Created ZIP archive: {archive}")
-        return archive
+        zip_output = zip_path.with_suffix(".zip")
+        with zipfile.ZipFile(zip_output, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+            for root, _, files in os.walk(archive_root):
+                for file in files:
+                    file_path = Path(root) / file
+                    arcname = file_path.relative_to(archive_root.parent)
+                    zf.write(file_path, arcname)
+        print(f"[Build] Created ZIP archive with max compression: {zip_output}")
+        return str(zip_output)
     finally:
         archive_root.rename(folder_path)
         print(f"[Build] Renamed '{archive_root}' -> '{folder_path}'")

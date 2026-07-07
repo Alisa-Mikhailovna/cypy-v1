@@ -4,12 +4,8 @@ from PIL.Image import Image
 from cypy.core.providers.base import LLMProvider
 from cypy.core.config import REQUEST_TIMEOUT
 
-try:
-    from google import genai
-    from google.genai import types
-except ImportError:
-    genai = None
-    types = None
+from google import genai
+from google.genai import types
 
 class GeminiProvider(LLMProvider):
     """

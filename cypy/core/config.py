@@ -55,7 +55,7 @@ TARGET_LANGUAGE: str = os.getenv("TARGET_LANGUAGE", "")
 
 
 # ✦ Assets Path - YOLO model and font files go here~ ✦
-MODEL_YOLO = os.path.join(ASSETS_DIR, "eyecyre.onnx")
+MODEL_YOLO = os.path.join(ASSETS_DIR, "eyecypy.onnx")
 FONT_MANGA = os.path.join(ASSETS_DIR, "Komika Axis.ttf")
 
 # Timeout to be set when requesting to LLM provider endpoint

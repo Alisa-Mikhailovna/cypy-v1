@@ -271,6 +271,28 @@ def package_release(project_root: Union[str, Path]):
                 shutil.copy2(s, d, follow_symlinks=False)
         print("[Build] Copied all compiled files and folders into release folder.")
 
+    # Remove heavy unused assets to optimize package size
+    internal_dir = app_folder_path / "_internal"
+    if not internal_dir.is_dir():
+        internal_dir = app_folder_path
+
+    ffmpeg_dll = internal_dir / "cv2" / "opencv_videoio_ffmpeg4100_64.dll"
+    if ffmpeg_dll.is_file():
+        try:
+            ffmpeg_dll.unlink()
+            print("[Build] Removed unused FFmpeg DLL from cv2 (~25.1MB saved).")
+        except Exception as e:
+            print(f"[Build] Warning: Failed to optimize cv2 size: {e}", file=sys.stderr)
+
+    for unused_asset in ["before.jpg", "after.png"]:
+        asset_file = internal_dir / "assets" / unused_asset
+        if asset_file.is_file():
+            try:
+                asset_file.unlink()
+                print(f"[Build] Removed unused preview asset: {unused_asset}")
+            except Exception:
+                pass
+
     # Copy extra files
     for extra in EXTRA_FILES:
         if not extra.is_file(): continue

@@ -295,6 +295,16 @@ def package_release(project_root: Union[str, Path]):
             except Exception:
                 pass
 
+    # Remove unused heavy image format plugins from Pillow (AVIF is not used)
+    pil_dir = internal_dir / "PIL"
+    if pil_dir.is_dir():
+        for f in pil_dir.glob("_avif*.pyd"):
+            try:
+                f.unlink()
+                print(f"[Build] Removed unused PIL AVIF plugin: {f.name} (~7.5MB saved).")
+            except Exception as e:
+                print(f"[Build] Warning: Failed to optimize PIL size: {e}", file=sys.stderr)
+
     # Copy extra files
     for extra in EXTRA_FILES:
         if not extra.is_file(): continue

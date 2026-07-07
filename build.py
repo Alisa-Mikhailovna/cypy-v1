@@ -282,16 +282,14 @@ def package_release(project_root: Union[str, Path]):
     if ffmpeg_dll.is_file():
         try:
             ffmpeg_dll.unlink()
-            print("[Build] Removed unused FFmpeg DLL from cv2 (~25.1MB saved).")
         except Exception as e:
-            print(f"[Build] Warning: Failed to optimize cv2 size: {e}", file=sys.stderr)
+            pass
 
     for unused_asset in ["before.jpg", "after.png"]:
         asset_file = internal_dir / "assets" / unused_asset
         if asset_file.is_file():
             try:
                 asset_file.unlink()
-                print(f"[Build] Removed unused preview asset: {unused_asset}")
             except Exception:
                 pass
 
@@ -301,9 +299,8 @@ def package_release(project_root: Union[str, Path]):
         for f in pil_dir.glob("_avif*.pyd"):
             try:
                 f.unlink()
-                print(f"[Build] Removed unused PIL AVIF plugin: {f.name} (~7.5MB saved).")
             except Exception as e:
-                print(f"[Build] Warning: Failed to optimize PIL size: {e}", file=sys.stderr)
+                pass
 
     # Copy extra files
     for extra in EXTRA_FILES:

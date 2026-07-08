@@ -4,139 +4,92 @@
   <img src="assets/favicon.png" width="128" alt="cypy Logo" />
 </p>
 
-**cypy** is a CLI manga translator using YOLOv8 to detect speech bubbles and the Google Gemini API to translate foreign text, keeping artwork clean and typography well-fitted.
+<p align="center">
+  <img src="assets/gui.webp" alt="cypy GUI Screenshot" />
+</p>
 
 ---
 
-## Preview
+**cypy** is a modern manga translator application utilizing YOLOv8 to accurately detect speech bubbles and Google Gemini API / OpenAI API to translate comic panels while keeping original artwork clean and typography well-fitted.
 
-| Before (Original Page) | After (Translated Page) |
+The application offers two operation modes:
+- **GUI Mode:** A sleek, pitch-black retro graphical interface featuring Consolas monospace font, pixel-perfect 1px borders, and full **Drag & Drop** support.
+- **CLI Mode:** An interactive command-line interface for fast and efficient translation directly from your terminal.
+
+### Translation Example (Before / After)
+
+| Original Page (Before) | Translated Page (After) |
 | :---: | :---: |
-| ![Original Manga Page](assets/before.jpg) | ![Translated Indonesian Manga Page](assets/after.png) |
+| <img src="assets/before.webp" width="380" alt="Original Manga" /> | <img src="assets/after.webp" width="380" alt="Translated Manga" /> |
 
----
+### Features
 
-## Features
+- **Drag & Drop Support (GUI / CLI):** Drag any manga files (Images, PDF, ZIP, CBZ, RAR, CBR) or directories and drop them directly onto the GUI window or terminal prompt to automatically populate the source path.
+- **On-the-Fly Configuration (GUI / CLI):** Switch target languages, LLM models, and AI providers on the fly, or tweak bubble layout padding and font scales dynamically.
+- **Smart Hybrid Storage:**
+  - **Portable Mode:** Saves your configuration to `./data/settings.json` when run from local writable folders.
+  - **Installed Mode:** Automatically redirects settings to `%LOCALAPPDATA%/cypy/settings.json` if run from protected system folders (like `Program Files`) to prevent permission errors and preserve preferences during upgrades.
+- **Multi-Language Translation:** Translate manga to English, Indonesian, Japanese, Mandarin, Spanish, Portuguese, Javanese, Korean, Russian, and Thai.
+- **Multi-Provider AI Engines:** Out-of-the-box support for **Google Gemini**, **OpenAI**, **Zen** (free, no API key required), **OpenCode Go**, **OpenRouter**, and **Custom Provider** (OpenAI-compatible base URL & custom model).
+- **Official Publisher Metadata:** Built Windows executables (`.exe`) are dynamically stamped with publisher properties (**indravoyager**).
 
-- **Multi-Language Support:** Translate to English, Indonesian, Japanese (with native vertical *Tategaki* text!), Mandarin (简体中文), Spanish, Portuguese, Javanese, and **Custom Languages** (supports Thai, Arabic, Cyrillic, etc. with automatic full variable font downloading!).
-- **Multi-Provider AI:** Choose between **Google Gemini**, **OpenAI** (GPT-5.4), **Zen** (free, no key needed), **OpenCode Go** (high-performance), **OpenRouter** (100+ models), or **Custom** (any OpenAI-compatible API) directly from the CLI.
-- **Interactive Commands:** Change the target language (`lang`), switch API providers (`provider`), change models (`model`), or check current settings (`status`) on the fly inside the loop.
-- **Zero-Setup Startup:** Prompts for the API key in the CLI and generates the `.env` file automatically if missing. Zen works out of the box — no API key required.
-- **Custom API Support:** Bring your own OpenAI-compatible endpoint with configurable base URL, API key, and model.
-- **Auto Desktop Shortcut:** Creates a rounded Windows desktop shortcut automatically on the first run.
-- **Persistent Settings:** Your preferences (active language, provider, models, and keys) are automatically saved to `data/settings.json` whenever they change, preserving your configuration across runs.
-- **Dynamic Box Layouts:** Terminal tables, guides, and status cards calculate width dynamically using East Asian Width rules, ensuring perfect column alignment even with CJK characters or long names.
+### Installation & Setup
 
----
+#### Prerequisites
+- **Python:** Version `3.8` to `3.11` (Python `3.10` recommended).
 
-## Installation & Setup
+#### Step 1: Clone the Repository & Prepare Virtual Environment
+```bash
+# 1. Clone cypy repository
+git clone https://github.com/indravoyager/cypy.git
+cd cypy
 
-### Option 1: Standalone Release (Recommended)
-Download the pre-compiled package for your OS from the [Releases](https://github.com/indravoyager/cypy/releases) page.
-1. Download and extract the `.zip` file.
-2. Run the application:
-   - **Windows:** Double-click `cypy.exe` inside the extracted folder. A desktop shortcut with the custom cypy icon will be automatically created on the first run!
-   - **Linux:** Open a terminal in the extracted folder, make it executable, and run:
-     ```bash
-     chmod +x cypy
-     ./cypy
-     ```
-   - **macOS:** Run `./cypy` inside the extracted folder.
-3. Paste your Gemini API key when prompted on the first run.
+# 2. Create virtual environment
+python -m venv venv
 
-### Option 2: Run from Source (For Developers)
-1. **Clone the repo:**
-   ```bash
-   git clone https://github.com/indravoyager/cypy.git
-   cd cypy
-   ```
-2. **Set up virtual environment:**
-   ```bash
-   python -m venv venv
-   # Activate:
-   source venv/bin/activate  # Linux/macOS
-   venv\Scripts\activate     # Windows (CMD)
-   ```
-3. **Install in editable mode:**
-   ```bash
-   pip install -e .
-   ```
-4. **Run the application:**
-   Once installed, you can launch the app from any directory:
-   ```bash
-   cypy
-   ```
-   Or run it directly as a module from the project root:
-   ```bash
-   python -m cypy
-   ```
+# 3. Activate the virtual environment
+# Windows:
+venv\Scripts\activate
+# Linux / macOS:
+source venv/bin/activate
+```
 
-### Option 3: Building Standalone Executable (Using PyInstaller)
-If you want to compile `cypy` into a standalone, optimized directory package yourself, run the build script:
+#### Step 2: Install Dependencies & Application
+```bash
+pip install -e .
+```
+
+#### Step 3: Run the Application
+Once installed, you can use the registered shortcut command `cypy` directly from your terminal:
+- **GUI Mode (Recommended / Default):**
+  Running `cypy` without arguments defaults to GUI mode.
+  ```bash
+  cypy
+  ```
+- **CLI Mode (Interactive Terminal):**
+  Use the `--cli` flag to start in terminal mode.
+  ```bash
+  cypy --cli
+  ```
+
+### Interactive CLI Commands
+
+When running in **CLI Mode**, you can type these commands directly in the prompt before dropping your files:
+
+| Command | Description |
+| :--- | :--- |
+| `lang` / `switch` | Dynamically select/change the target translation language. |
+| `provider` / `api` | Choose/switch the active LLM provider (Gemini, OpenAI, Zen, etc.). |
+| `model` | Instantly change the active LLM model name. |
+| `status` | Display current API key status and configurations. |
+| `tweak` | Open the layout tweak menu to adjust padding margins, font scales, etc. |
+| `help` | Print list of available commands. |
+| `stop` / `exit` | Exit the application. |
+
+### Compiling Standalone Executable (.exe)
+To package `cypy` into a standalone Windows executable (`.exe`) stamped with the **indravoyager** metadata, run:
 ```bash
 python build.py
-```
-This requires **PyInstaller** (which will be installed automatically if missing) and will output the ready-to-run `.zip` package inside the `releases/` directory.
-
----
-
-## Configuration
-
-Customise settings inside the `.env` file:
-
-```env
-# Gemini Config (Default)
-GEMINI_API_KEY=your_gemini_api_key_here
-MODEL_GEMINI=gemini-3.1-flash-lite
-
-# OpenAI Config (Optional)
-OPENAI_API_KEY=your_openai_api_key_here
-MODEL_OPENAI=gpt-5.4-mini
-
-# Zen (https://opencode.ai) — no API key required
-ZEN_API_KEY=
-MODEL_ZEN=minimax-m3-free
-
-# OpenCode Go (https://opencode.ai) — API key required
-OPENCODEGO_API_KEY=your_opencode_go_api_key_here
-MODEL_OPENCODEGO=mimo-v2.5
-
-# OpenRouter Config (Optional)
-OPENROUTER_API_KEY=your_openrouter_api_key_here
-MODEL_OPENROUTER=qwen/qwen2.5-vl-72b-instruct:free
-
-# Custom OpenAI-compatible provider
-CUSTOM_BASE_URL=https://your-api.example.com/v1
-CUSTOM_API_KEY=your_api_key_here
-MODEL_CUSTOM=gpt-5.4-mini
-```
-
-> [NOTE]
-> Advanced layout settings (margins, font scales, etc.) can be adjusted in [cypy/core/config.py](cypy/core/config.py).
-
----
-
-## Project Structure
-
-```text
-cypy/
-├── assets/              # YOLO model weights, font, and icons
-├── cypy/                # Main Python package
-│   ├── app.py           # Entrypoint loop & CLI logic
-│   ├── __main__.py      # Module entrypoint for `python -m cypy`
-│   └── core/            # Engine modules
-│       ├── config.py
-│       ├── translator.py
-│       ├── utils.py
-│       └── providers/   # LLM integrations
-│           ├── base.py
-│           ├── gemini.py
-│           ├── openai_provider.py
-│           ├── zen.py
-│           ├── openrouter.py
-│           └── custom.py
-├── pyproject.toml       # Python package configuration
-└── README.md
 ```
 
 ---

@@ -13,11 +13,13 @@ dependencies = [
     "PyMuPDF",
     "numpy",
     "Pillow",
-    "onnxruntime",
     "google-genai",
     "python-dotenv",
     "requests",
-    "rarfile"
+    "rarfile",
+    "kivy",
+    "customtkinter",
+    "tkinterdnd2"
 ]
 
 [project.scripts]

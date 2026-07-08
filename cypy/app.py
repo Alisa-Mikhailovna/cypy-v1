@@ -386,6 +386,18 @@ def tampilkan_status(provider, target_language):
 
 
 def main():
+    # Detect launch mode based on executable name or arguments
+    exe_name = os.path.basename(sys.argv[0]).lower()
+    
+    # Run in CLI mode if '--cli' is specified or the executable name contains 'cli'
+    # Otherwise, default to GUI mode
+    is_cli_mode = "--cli" in sys.argv or "cli" in exe_name
+    
+    if not is_cli_mode:
+        from cypy.gui import main as gui_main
+        gui_main()
+        return
+
     # Automatically create desktop shortcut on first run (Windows only)
     create_shortcut_if_first_run()
 

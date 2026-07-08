@@ -20,7 +20,7 @@ ICON_PATH = ROOT_DIR / FAVICON_PATH \
     if FAVICON_PATH                 \
     else ASSETS_DIR / "favicon.ico"
 
-APP_ENTRY_POINT = ROOT_DIR / APP_NAME / "app.py"
+APP_ENTRY_POINT = ROOT_DIR / "cypy" / "app.py"
 
 EXEC_PATH = sys.executable
 REQUIRED_DEPS = {
@@ -64,9 +64,7 @@ def check_dependencies(deps: Iterable[str]) -> List[str]:
 
             for line in proc.stdout:
                 package = line.partition("==")[0].strip()
-                # Normalize case for comparison
                 if package.lower() in {d.lower() for d in deps}:
-                    # Find exact case match
                     for d in deps:
                         if d.lower() == package.lower():
                             print(f"[Build] Dependency installed: {d}")
@@ -99,6 +97,251 @@ def install_dependencies(deps: Iterable[str]):
         print(f"[Build] Failed to install {', '.join(deps)}: {e}", file=sys.stderr)
         sys.exit(e.returncode)
 
+def compile_pyinstaller(name: str, noconsole: bool):
+    curr_system = platform.system().lower()
+    is_favicon_exist = ICON_PATH.is_file()
+    data_sep = ";" if curr_system == "windows" else ":"
+    build_temp_dir = ROOT_DIR / "build_temp"
+
+    # Prepare version info for Windows build metadata (Publisher: indravoyager)
+    version_file_path = ROOT_DIR / "version_info.txt"
+    version_file_created = False
+    if curr_system == "windows":
+        try:
+            ver_parts = []
+            for part in APP_VER.lstrip("vV").split('.'):
+                try:
+                    ver_parts.append(int(part))
+                except ValueError:
+                    ver_parts.append(0)
+            while len(ver_parts) < 4:
+                ver_parts.append(0)
+            version_tuple = tuple(ver_parts[:4])
+            
+            file_description = "CYPY Manga Translator" if "cli" not in name.lower() else "CYPY Manga Translator (CLI)"
+            original_filename = f"{name}.exe"
+            
+            version_info_content = f"""# UTF-8
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers={version_tuple},
+    prodvers={version_tuple},
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+    ),
+  kids=[
+    StringFileInfo(
+      [
+      StringTable(
+        '040904B0',
+        [StringStruct('CompanyName', 'indravoyager'),
+        StringStruct('FileDescription', '{file_description}'),
+        StringStruct('FileVersion', '{APP_VER}'),
+        StringStruct('InternalName', '{name}'),
+        StringStruct('LegalCopyright', 'Copyright (c) 2026 indravoyager'),
+        StringStruct('OriginalFilename', '{original_filename}'),
+        StringStruct('ProductName', 'CYPY'),
+        StringStruct('ProductVersion', '{APP_VER}')])
+      ]), 
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
+"""
+            with open(version_file_path, "w", encoding="utf-8") as vf:
+                vf.write(version_info_content)
+            version_file_created = True
+            print(f"[Build] Generated Windows executable version metadata for {name} (Publisher: indravoyager).")
+        except Exception as ve:
+            print(f"[Build] Warning: Failed to generate version info: {ve}")
+
+    # Build command using PyInstaller
+    cmd: List[str] = [
+        EXEC_PATH, "-m", "PyInstaller",
+        "--noconfirm",
+        "--onedir",
+        f"--name={name}",
+        f"--distpath={DIST_DIR}",
+        f"--workpath={build_temp_dir}",
+        f"--add-data={ASSETS_DIR}{data_sep}assets",
+        "--collect-all=tkinterdnd2",
+        "--exclude-module=pandas",
+        "--exclude-module=tensorboard",
+        "--exclude-module=kivy",
+        "--exclude-module=IPython",
+        "--exclude-module=torch",
+        "--exclude-module=ultralytics",
+        "--exclude-module=lxml",
+    ]
+
+    if noconsole:
+        cmd.append("--noconsole")
+    else:
+        cmd.append("--console")
+
+    if is_favicon_exist:
+        cmd.append(f"--icon={ICON_PATH}")
+
+    if version_file_created:
+        cmd.append(f"--version-file={version_file_path}")
+
+    cmd.append(str(APP_ENTRY_POINT))
+
+    print(f"[Build] Running PyInstaller compilation command for {name}:\n{' '.join(cmd)}")
+    try:
+        subprocess.check_call(cmd)
+        print(f"[Build] PyInstaller compilation for {name} completed successfully!")
+    except subprocess.CalledProcessError as e:
+        print(f"[Build] PyInstaller compilation for {name} failed with exit code: {e.returncode}")
+        sys.exit(1)
+    finally:
+        # Clean up version info file
+        if version_file_created and version_file_path.is_file():
+            try: version_file_path.unlink()
+            except Exception: pass
+
+        # Clean up spec file
+        spec_file = ROOT_DIR / f"{name}.spec"
+        if spec_file.is_file():
+            try: spec_file.unlink()
+            except Exception: pass
+
+def package_combined_release():
+    RELEASES_DIR.mkdir(parents=True, exist_ok=True)
+    DIST_DIR.mkdir(parents=True, exist_ok=True)
+
+    os_system = platform.system().lower()
+    arch = normalize_arch(platform.machine())
+    os_name = "macos" if os_system == "darwin" else os_system
+
+    # ZIP name format: cypy-v0.2508-windows-x64-portable.zip
+    if os_name == "windows":
+        zip_name = f"{APP_NAME}-{APP_VER}-{os_name}-{arch}-portable.zip"
+    else:
+        zip_name = f"{APP_NAME}-{APP_VER}-{os_name}-{arch}.zip"
+
+    zip_path = RELEASES_DIR / zip_name
+    print(f"[Build] Packaging combined application for {os_name} ({arch})...")
+
+    # GUI source and CLI source
+    gui_dist = DIST_DIR / "cypy-gui"
+    cli_dist = DIST_DIR / "cypy-cli"
+
+    if not gui_dist.is_dir() or not cli_dist.is_dir():
+        print(f"[Build] Error: Compiled folders not found.\nGUI: {gui_dist.is_dir()}, CLI: {cli_dist.is_dir()}", file=sys.stderr)
+        sys.exit(2)
+
+    app_folder_path = DIST_DIR / f"{APP_NAME}_pkg_temp"
+    if app_folder_path.is_dir():
+        try: shutil.rmtree(app_folder_path)
+        except Exception as e:
+            print(f"[Build] Warning: Failed to remove old temporary directory: {e}", file=sys.stderr)
+    app_folder_path.mkdir(exist_ok=True)
+
+    # Copy files from GUI build first (this forms the baseline with _internal and cypy-gui.exe)
+    for item in os.listdir(gui_dist):
+        s = gui_dist / item
+        d = app_folder_path / item
+        if s.is_dir():
+            shutil.copytree(s, d, symlinks=True)
+        else:
+            shutil.copy2(s, d, follow_symlinks=False)
+    print("[Build] Copied cypy-gui files into release folder.")
+
+    # Copy cypy-cli executable into the same folder as cypy-gui (sibling)
+    cli_exe_name = "cypy-cli.exe" if os_name == "windows" else "cypy-cli"
+    shutil.copy2(cli_dist / cli_exe_name, app_folder_path / cli_exe_name)
+    print(f"[Build] Copied {cli_exe_name} into release folder.")
+
+    # Remove heavy unused assets to optimize package size
+    internal_dir = app_folder_path / "_internal"
+    if not internal_dir.is_dir():
+        internal_dir = app_folder_path
+
+    ffmpeg_dll = internal_dir / "cv2" / "opencv_videoio_ffmpeg4100_64.dll"
+    if ffmpeg_dll.is_file():
+        try: ffmpeg_dll.unlink()
+        except Exception: pass
+
+    for unused_asset in ["before.jpg", "after.png"]:
+        asset_file = internal_dir / "assets" / unused_asset
+        if asset_file.is_file():
+            try: asset_file.unlink()
+            except Exception: pass
+
+    # Remove unused heavy image format plugins from Pillow (AVIF is not used)
+    pil_dir = internal_dir / "PIL"
+    if pil_dir.is_dir():
+        for f in pil_dir.glob("_avif*.pyd"):
+            try: f.unlink()
+            except Exception: pass
+
+    # Copy extra files
+    for extra in EXTRA_FILES:
+        if not extra.is_file(): continue
+        try:
+            shutil.copy(extra, app_folder_path / extra.name)
+            print(f"[Build] Copied {extra.name} into release folder.")
+        except Exception as e:
+            print(f"[Build] Warning: Failed to copy {extra.name}: {e}", file=sys.stderr)
+
+    has_cleanup = False
+    def cleanup() -> None:
+        nonlocal has_cleanup
+        if has_cleanup or not app_folder_path.is_dir(): return
+        try:
+            has_cleanup = True
+            shutil.rmtree(app_folder_path)
+        except Exception as e:
+            print(f"[Build] Warning: Failed to clean up temporary release folder: {e}", file=sys.stderr)
+
+    try:
+        print(f"[Build] Zipping folder: {app_folder_path} to {zip_path}...")
+        created_zip = safe_zip_directory(APP_NAME, app_folder_path, zip_path)
+        created_zip_path = Path(created_zip)
+        if not created_zip_path.is_file():
+            raise FileNotFoundError(f"[Build] Expected archive not found: {created_zip}")
+
+        if RELEASES_DIR not in created_zip_path.parents:
+            created_zip_path = Path(shutil.move(created_zip_path, RELEASES_DIR / created_zip_path.name))
+
+        print(f"[Build] Packaged successfully to: {created_zip_path}")
+        print(f"[Build] Package size: {created_zip_path.stat().st_size / (1024*1024):.2f} MB")
+    except Exception as e:
+        print(f"[Build] Packaging failed: {e}", file=sys.stderr)
+        sys.exit(1)
+    finally:
+        cleanup()
+
+def safe_zip_directory(name: str, folder_path: Union[str, Path], zip_path: Union[str, Path]) -> str:
+    import zipfile
+    folder_path = Path(folder_path).resolve()
+    zip_path = Path(zip_path).resolve()
+
+    if not folder_path.is_dir():
+        raise NotADirectoryError(folder_path)
+
+    archive_root = folder_path.parent / name
+    folder_path.rename(archive_root)
+    print(f"[Build] Renamed '{folder_path}' -> '{archive_root}'")
+
+    try:
+        zip_output = zip_path.with_suffix(".zip")
+        with zipfile.ZipFile(zip_output, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+            for root, _, files in os.walk(archive_root):
+                for file in files:
+                    file_path = Path(root) / file
+                    arcname = file_path.relative_to(archive_root.parent)
+                    zf.write(file_path, arcname)
+        print(f"[Build] Created ZIP archive with max compression: {zip_output}")
+        return str(zip_output)
+    finally:
+        archive_root.rename(folder_path)
+        print(f"[Build] Renamed '{archive_root}' -> '{folder_path}'")
+
 def run_build():
     available_deps = check_dependencies(REQUIRED_DEPS)
     missing_deps = REQUIRED_DEPS - set(available_deps)
@@ -119,13 +362,6 @@ def run_build():
     build_temp_dir = ROOT_DIR / "build_temp"
     if build_temp_dir.exists():
         shutil.rmtree(build_temp_dir, ignore_errors=True)
-
-    # OS-specific settings
-    curr_system = platform.system().lower()
-    is_favicon_exist = ICON_PATH.is_file()
-    
-    # Path separator for PyInstaller --add-data
-    data_sep = ";" if curr_system == "windows" else ":"
 
     # Prepare model assets
     onnx_path = ASSETS_DIR / "eyecypy.onnx"
@@ -150,45 +386,34 @@ def run_build():
             print(f"[Build] Error processing model: {e}")
             sys.exit(1)
 
-    # Build command using PyInstaller
-    cmd: List[str] = [
-        EXEC_PATH, "-m", "PyInstaller",
-        "--noconfirm",
-        "--onedir",
-        "--console",
-        f"--name={APP_NAME}",
-        f"--distpath={DIST_DIR}",
-        f"--workpath={build_temp_dir}",
-        f"--add-data={ASSETS_DIR}{data_sep}assets",
-        "--exclude-module=pandas",
-        "--exclude-module=tensorboard",
-        "--exclude-module=tkinter",
-        "--exclude-module=IPython",
-        "--exclude-module=torch",
-        "--exclude-module=ultralytics",
-        "--exclude-module=lxml",
-    ]
-
-    if is_favicon_exist:
-        cmd.append(f"--icon={ICON_PATH}")
-
-    cmd.append(str(APP_ENTRY_POINT))
-
-    print(f"[Build] Running PyInstaller compilation command:\n{' '.join(cmd)}")
     try:
-        subprocess.check_call(cmd)
-        print("[Build] PyInstaller compilation completed successfully!")
-    except subprocess.CalledProcessError as e:
-        print(f"[Build] PyInstaller compilation failed with exit code: {e.returncode}")
-        sys.exit(1)
+        # Build 1: GUI (name="cypy-gui", noconsole=True)
+        print("\n=== BUILDING GUI VERSION ===")
+        compile_pyinstaller("cypy-gui", noconsole=True)
+
+        # Build 2: CLI (name="cypy-cli", noconsole=False)
+        print("\n=== BUILDING CLI VERSION ===")
+        compile_pyinstaller("cypy-cli", noconsole=False)
+
+        # Package them combined into one portable release
+        package_combined_release()
+        
+        # Windows Installer Compatibility:
+        # Copy cypy-cli.exe from dist/cypy-cli into dist/cypy-gui so setup.iss can package both together
+        if platform.system().lower() == "windows":
+            try:
+                src_cli = DIST_DIR / "cypy-cli" / "cypy-cli.exe"
+                dest_cli = DIST_DIR / "cypy-gui" / "cypy-cli.exe"
+                if src_cli.is_file():
+                    shutil.copy2(src_cli, dest_cli)
+                    print("[Build] Synced cypy-cli.exe to dist/cypy-gui for Inno Setup Installer compatibility.")
+            except Exception as sync_err:
+                print(f"[Build] Warning: Failed to sync CLI to GUI dist folder for installer: {sync_err}")
+        
     finally:
         # Clean up temporary build spec/work path files
         if build_temp_dir.exists():
             shutil.rmtree(build_temp_dir, ignore_errors=True)
-        spec_file = ROOT_DIR / f"{APP_NAME}.spec"
-        if spec_file.is_file():
-            try: spec_file.unlink()
-            except Exception: pass
             
         # Restore raw model if it was relocated
         if onnx_renamed:
@@ -203,181 +428,6 @@ def run_build():
                     dat_path.unlink()
                 except Exception as e:
                     print(f"[Build] Warning: Failed to clean temporary assets: {e}")
-
-    package_release(ROOT_DIR)
-
-def package_release(project_root: Union[str, Path]):
-    project_root = Path(project_root).absolute()
-    RELEASES_DIR.mkdir(parents=True, exist_ok=True)
-    DIST_DIR.mkdir(parents=True, exist_ok=True)
-
-    os_system = platform.system().lower()
-    arch = normalize_arch(platform.machine())
-    os_name = "macos" if os_system == "darwin" else os_system
-
-    # Naming convention matching xidown: cypy-[version]-[os]-[arch][-portable].zip
-    if os_name == "windows":
-        zip_name = f"{APP_NAME}-{APP_VER}-{os_name}-{arch}-portable.zip"
-    else:
-        zip_name = f"{APP_NAME}-{APP_VER}-{os_name}-{arch}.zip"
-
-    zip_path = RELEASES_DIR / zip_name
-    print(f"[Build] Packaging application for {os_name} ({arch})...")
-
-    # Detect PyInstaller output (handles both onefile and onedir modes)
-    is_onefile = False
-    pyinstaller_output = DIST_DIR / APP_NAME
-    
-    if os_name == "windows":
-        onefile_path = DIST_DIR / f"{APP_NAME}.exe"
-        if onefile_path.is_file():
-            pyinstaller_output = onefile_path
-            is_onefile = True
-    else:
-        app_bundle = DIST_DIR / f"{APP_NAME}.app"
-        if app_bundle.is_dir():
-            pyinstaller_output = app_bundle
-        elif (DIST_DIR / APP_NAME).is_file():
-            pyinstaller_output = DIST_DIR / APP_NAME
-            is_onefile = True
-
-    if not pyinstaller_output or (not is_onefile and not pyinstaller_output.is_dir()) or (is_onefile and not pyinstaller_output.is_file()):
-        print(
-            f"[Build] Error: PyInstaller valid output not found.\n" +
-            f"[Build] Contents of 'dist/': {list(DIST_DIR.iterdir()) if DIST_DIR.exists() else 'NOT FOUND'}",
-            file=sys.stderr
-        )
-        sys.exit(2)
-
-    print(f"[Build] Found PyInstaller output at: {pyinstaller_output}")
-
-    app_folder_path = DIST_DIR / f"{APP_NAME}_pkg_temp"
-    if app_folder_path.is_dir():
-        try: shutil.rmtree(app_folder_path)
-        except Exception as e:
-            print(f"[Build] Warning: Failed to remove old temporary directory: {e}", file=sys.stderr)
-    app_folder_path.mkdir(exist_ok=True)
-
-    # Copy files
-    if is_onefile:
-        shutil.copy2(pyinstaller_output, app_folder_path / pyinstaller_output.name)
-        print(f"[Build] Copied compiled executable {pyinstaller_output.name} into release folder.")
-    else:
-        for item in os.listdir(pyinstaller_output):
-            s = pyinstaller_output / item
-            d = app_folder_path / item
-            if s.is_dir():
-                shutil.copytree(s, d, symlinks=True)
-            else:
-                shutil.copy2(s, d, follow_symlinks=False)
-        print("[Build] Copied all compiled files and folders into release folder.")
-
-    # Remove heavy unused assets to optimize package size
-    internal_dir = app_folder_path / "_internal"
-    if not internal_dir.is_dir():
-        internal_dir = app_folder_path
-
-    ffmpeg_dll = internal_dir / "cv2" / "opencv_videoio_ffmpeg4100_64.dll"
-    if ffmpeg_dll.is_file():
-        try:
-            ffmpeg_dll.unlink()
-        except Exception as e:
-            pass
-
-    for unused_asset in ["before.jpg", "after.png"]:
-        asset_file = internal_dir / "assets" / unused_asset
-        if asset_file.is_file():
-            try:
-                asset_file.unlink()
-            except Exception:
-                pass
-
-    # Remove unused heavy image format plugins from Pillow (AVIF is not used)
-    pil_dir = internal_dir / "PIL"
-    if pil_dir.is_dir():
-        for f in pil_dir.glob("_avif*.pyd"):
-            try:
-                f.unlink()
-            except Exception as e:
-                pass
-
-    # Copy extra files
-    for extra in EXTRA_FILES:
-        if not extra.is_file(): continue
-        try:
-            shutil.copy(extra, app_folder_path / extra.name)
-            print(f"[Build] Copied {extra.name} into release folder.")
-        except Exception as e:
-            print(f"[Build] Warning: Failed to copy {extra.name}: {e}", file=sys.stderr)
-
-    has_cleanup: bool = False
-    def cleanup() -> None:
-        nonlocal has_cleanup
-        if has_cleanup or not app_folder_path.is_dir(): return
-        try:
-            has_cleanup = True
-            shutil.rmtree(app_folder_path)
-        except Exception as e:
-            print(f"[Build] Warning: Failed to clean up temporary release folder: {e}", file=sys.stderr)
-
-    try:
-        # Temporary rename pyinstaller output to avoid collision with zip renaming
-        pyinstaller_output_renamed = pyinstaller_output.parent / f"{pyinstaller_output.name}_raw"
-        if pyinstaller_output.exists():
-            try:
-                pyinstaller_output.rename(pyinstaller_output_renamed)
-            except Exception as rename_err:
-                print(f"[Build] Warning: Failed to temporarily rename raw output: {rename_err}", file=sys.stderr)
-        
-        try:
-            print(f"[Build] Zipping folder: {app_folder_path} to {zip_path}...")
-            created_zip = safe_zip_directory(app_folder_path, zip_path)
-            created_zip_path = Path(created_zip)
-            if not created_zip_path.is_file():
-                raise FileNotFoundError(f"[Build] Expected archive not found: {created_zip}")
-
-            if RELEASES_DIR not in created_zip_path.parents:
-                created_zip_path = Path(shutil.move(created_zip_path, RELEASES_DIR / created_zip_path.name))
-
-            print(f"[Build] Packaged successfully to: {created_zip_path}")
-            print(f"[Build] Package size: {created_zip_path.stat().st_size / (1024*1024):.2f} MB")
-        finally:
-            if pyinstaller_output_renamed.exists():
-                try:
-                    pyinstaller_output_renamed.rename(pyinstaller_output)
-                except Exception as restore_err:
-                    print(f"[Build] Warning: Failed to restore raw output folder: {restore_err}", file=sys.stderr)
-    except Exception as e:
-        print(f"[Build] Packaging failed: {e}", file=sys.stderr)
-        sys.exit(1)
-    finally:
-        cleanup()
-
-def safe_zip_directory(folder_path: Union[str, Path], zip_path: Union[str, Path]) -> str:
-    import zipfile
-    folder_path = Path(folder_path).resolve()
-    zip_path = Path(zip_path).resolve()
-
-    if not folder_path.is_dir():
-        raise NotADirectoryError(folder_path)
-
-    archive_root = folder_path.parent / APP_NAME
-    folder_path.rename(archive_root)
-    print(f"[Build] Renamed '{folder_path}' -> '{archive_root}'")
-
-    try:
-        zip_output = zip_path.with_suffix(".zip")
-        with zipfile.ZipFile(zip_output, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-            for root, _, files in os.walk(archive_root):
-                for file in files:
-                    file_path = Path(root) / file
-                    arcname = file_path.relative_to(archive_root.parent)
-                    zf.write(file_path, arcname)
-        print(f"[Build] Created ZIP archive with max compression: {zip_output}")
-        return str(zip_output)
-    finally:
-        archive_root.rename(folder_path)
-        print(f"[Build] Renamed '{archive_root}' -> '{folder_path}'")
 
 if __name__ == "__main__":
     run_build()

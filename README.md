@@ -45,37 +45,46 @@ Download the pre-compiled package for your OS from the [Releases](https://github
 3. Paste your Gemini API key when prompted on the first run.
 
 ### Option 2: Run from Source (For Developers)
-1. **Clone the repo:**
-   ```bash
-   git clone https://github.com/indravoyager/cypy.git
-   cd cypy
-   ```
-2. **Set up virtual environment:**
-   ```bash
-   python -m venv venv
-   # Activate:
-   source venv/bin/activate  # Linux/macOS
-   venv\Scripts\activate     # Windows (CMD)
-   ```
-3. **Install in editable mode:**
-   ```bash
-   pip install -e .
-   ```
-4. **Run the application:**
-   Once installed, you can launch the app from any directory:
-   ```bash
-   cypy
-   ```
-   Or run it directly as a module from the project root:
-   ```bash
-   python -m cypy
-   ```
+
+#### 1. Clone the repo
+```bash
+git clone https://github.com/indravoyager/cypy.git
+cd cypy
+```
+
+#### 2. Run directly with automated script
+
+**Windows (Command Prompt):**
+
+```cmd
+.\run.bat
+```
+
+> [!IMPORTANT]  
+> **The automated script for Windows currently supports only Command Prompt**. If you encounter issues when running the script in PowerShell, please use Command Prompt instead.
+
+**Linux & MacOS:**
+
+```bash
+./run.sh
+```
+
+---
+
+_(Optional)_ After running the automated script, consider to run one of these command based on your system:
+
+```bash
+source .venv/bin/activate   # Linux
+venv\Scripts\activate       # Windows (CMD)
+```
 
 ### Option 3: Building Standalone Executable (Using PyInstaller)
 If you want to compile `cypy` into a standalone, optimized directory package yourself, run the build script:
+
 ```bash
 python build.py
 ```
+
 This requires **PyInstaller** (which will be installed automatically if missing) and will output the ready-to-run `.zip` package inside the `releases/` directory.
 
 ---

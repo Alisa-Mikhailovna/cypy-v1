@@ -97,7 +97,7 @@ def install_dependencies(deps: Iterable[str]):
         print(f"[Build] Failed to install {', '.join(deps)}: {e}", file=sys.stderr)
         sys.exit(e.returncode)
 
-def compile_pyinstaller(name: str, noconsole: bool):
+def compile_pyinstaller(name: str, noconsole: bool, collect_dnd: bool = True, extra_excludes: List[str] = None):
     curr_system = platform.system().lower()
     is_favicon_exist = ICON_PATH.is_file()
     data_sep = ";" if curr_system == "windows" else ":"
@@ -167,7 +167,6 @@ VSVersionInfo(
         f"--distpath={DIST_DIR}",
         f"--workpath={build_temp_dir}",
         f"--add-data={ASSETS_DIR}{data_sep}assets",
-        "--collect-all=tkinterdnd2",
         "--exclude-module=pandas",
         "--exclude-module=tensorboard",
         "--exclude-module=kivy",
@@ -176,6 +175,13 @@ VSVersionInfo(
         "--exclude-module=ultralytics",
         "--exclude-module=lxml",
     ]
+
+    if collect_dnd:
+        cmd.append("--collect-all=tkinterdnd2")
+
+    if extra_excludes:
+        for ex in extra_excludes:
+            cmd.append(f"--exclude-module={ex}")
 
     if noconsole:
         cmd.append("--noconsole")
@@ -209,7 +215,7 @@ VSVersionInfo(
             try: spec_file.unlink()
             except Exception: pass
 
-def package_combined_release():
+def package_cli_release():
     RELEASES_DIR.mkdir(parents=True, exist_ok=True)
     DIST_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -217,21 +223,16 @@ def package_combined_release():
     arch = normalize_arch(platform.machine())
     os_name = "macos" if os_system == "darwin" else os_system
 
-    # ZIP name format: cypy-v0.2508-windows-x64-portable.zip
-    if os_name == "windows":
-        zip_name = f"{APP_NAME}-{APP_VER}-{os_name}-{arch}-portable.zip"
-    else:
-        zip_name = f"{APP_NAME}-{APP_VER}-{os_name}-{arch}.zip"
-
+    # ZIP name format: cypy-v0.2508-windows-x64-cli.zip
+    zip_name = f"{APP_NAME}-{APP_VER}-{os_name}-{arch}-cli.zip"
     zip_path = RELEASES_DIR / zip_name
-    print(f"[Build] Packaging combined application for {os_name} ({arch})...")
+    print(f"[Build] Packaging CLI application for {os_name} ({arch})...")
 
-    # GUI source and CLI source
-    gui_dist = DIST_DIR / "cypy-gui"
+    # CLI source dist
     cli_dist = DIST_DIR / "cypy-cli"
 
-    if not gui_dist.is_dir() or not cli_dist.is_dir():
-        print(f"[Build] Error: Compiled folders not found.\nGUI: {gui_dist.is_dir()}, CLI: {cli_dist.is_dir()}", file=sys.stderr)
+    if not cli_dist.is_dir():
+        print(f"[Build] Error: Compiled CLI folder not found at: {cli_dist}", file=sys.stderr)
         sys.exit(2)
 
     app_folder_path = DIST_DIR / f"{APP_NAME}_pkg_temp"
@@ -241,7 +242,107 @@ def package_combined_release():
             print(f"[Build] Warning: Failed to remove old temporary directory: {e}", file=sys.stderr)
     app_folder_path.mkdir(exist_ok=True)
 
-    # Copy files from GUI build first (this forms the baseline with _internal and cypy-gui.exe)
+    # Copy files from CLI build
+    for item in os.listdir(cli_dist):
+        s = cli_dist / item
+        d = app_folder_path / item
+        if s.is_dir():
+            shutil.copytree(s, d, symlinks=True)
+        else:
+            shutil.copy2(s, d, follow_symlinks=False)
+    print("[Build] Copied cypy-cli files into release folder.")
+
+    # Remove heavy unused assets to optimize package size
+    internal_dir = app_folder_path / "_internal"
+    if not internal_dir.is_dir():
+        internal_dir = app_folder_path
+
+    ffmpeg_dll = internal_dir / "cv2" / "opencv_videoio_ffmpeg4100_64.dll"
+    if ffmpeg_dll.is_file():
+        try: ffmpeg_dll.unlink()
+        except Exception: pass
+
+    for unused_asset in ["before.jpg", "after.png"]:
+        asset_file = internal_dir / "assets" / unused_asset
+        if asset_file.is_file():
+            try: asset_file.unlink()
+            except Exception: pass
+
+    # Remove unused heavy image format plugins from Pillow (AVIF is not used)
+    pil_dir = internal_dir / "PIL"
+    if pil_dir.is_dir():
+        for f in pil_dir.glob("_avif*.pyd"):
+            try: f.unlink()
+            except Exception: pass
+
+    # Copy extra files
+    for extra in EXTRA_FILES:
+        if not extra.is_file(): continue
+        try:
+            shutil.copy(extra, app_folder_path / extra.name)
+            print(f"[Build] Copied {extra.name} into release folder.")
+        except Exception as e:
+            print(f"[Build] Warning: Failed to copy {extra.name}: {e}", file=sys.stderr)
+
+    has_cleanup = False
+    def cleanup() -> None:
+        nonlocal has_cleanup
+        if has_cleanup or not app_folder_path.is_dir(): return
+        try:
+            has_cleanup = True
+            shutil.rmtree(app_folder_path)
+        except Exception as e:
+            print(f"[Build] Warning: Failed to clean up temporary release folder: {e}", file=sys.stderr)
+
+    try:
+        print(f"[Build] Zipping folder: {app_folder_path} to {zip_path}...")
+        created_zip = safe_zip_directory(APP_NAME, app_folder_path, zip_path)
+        created_zip_path = Path(created_zip)
+        if not created_zip_path.is_file():
+            raise FileNotFoundError(f"[Build] Expected archive not found: {created_zip}")
+
+        if RELEASES_DIR not in created_zip_path.parents:
+            created_zip_path = Path(shutil.move(created_zip_path, RELEASES_DIR / created_zip_path.name))
+
+        print(f"[Build] Packaged successfully to: {created_zip_path}")
+        print(f"[Build] Package size: {created_zip_path.stat().st_size / (1024*1024):.2f} MB")
+    except Exception as e:
+        print(f"[Build] Packaging failed: {e}", file=sys.stderr)
+        sys.exit(1)
+    finally:
+        cleanup()
+
+def package_gui_release():
+    os_system = platform.system().lower()
+    if os_system == "windows":
+        # Under Option A, we do not package GUI ZIP on Windows (distributed via Installer)
+        return
+
+    RELEASES_DIR.mkdir(parents=True, exist_ok=True)
+    DIST_DIR.mkdir(parents=True, exist_ok=True)
+
+    arch = normalize_arch(platform.machine())
+    os_name = "macos" if os_system == "darwin" else os_system
+
+    zip_name = f"{APP_NAME}-{APP_VER}-{os_name}-{arch}-gui.zip"
+    zip_path = RELEASES_DIR / zip_name
+    print(f"[Build] Packaging GUI application for {os_name} ({arch})...")
+
+    # GUI source dist
+    gui_dist = DIST_DIR / "cypy-gui"
+
+    if not gui_dist.is_dir():
+        print(f"[Build] Error: Compiled GUI folder not found at: {gui_dist}", file=sys.stderr)
+        sys.exit(2)
+
+    app_folder_path = DIST_DIR / f"{APP_NAME}_pkg_temp"
+    if app_folder_path.is_dir():
+        try: shutil.rmtree(app_folder_path)
+        except Exception as e:
+            print(f"[Build] Warning: Failed to remove old temporary directory: {e}", file=sys.stderr)
+    app_folder_path.mkdir(exist_ok=True)
+
+    # Copy files from GUI build
     for item in os.listdir(gui_dist):
         s = gui_dist / item
         d = app_folder_path / item
@@ -250,11 +351,6 @@ def package_combined_release():
         else:
             shutil.copy2(s, d, follow_symlinks=False)
     print("[Build] Copied cypy-gui files into release folder.")
-
-    # Copy cypy-cli executable into the same folder as cypy-gui (sibling)
-    cli_exe_name = "cypy-cli.exe" if os_name == "windows" else "cypy-cli"
-    shutil.copy2(cli_dist / cli_exe_name, app_folder_path / cli_exe_name)
-    print(f"[Build] Copied {cli_exe_name} into release folder.")
 
     # Remove heavy unused assets to optimize package size
     internal_dir = app_folder_path / "_internal"
@@ -389,14 +485,22 @@ def run_build():
     try:
         # Build 1: GUI (name="cypy-gui", noconsole=True)
         print("\n=== BUILDING GUI VERSION ===")
-        compile_pyinstaller("cypy-gui", noconsole=True)
+        compile_pyinstaller("cypy-gui", noconsole=True, collect_dnd=True)
 
         # Build 2: CLI (name="cypy-cli", noconsole=False)
         print("\n=== BUILDING CLI VERSION ===")
-        compile_pyinstaller("cypy-cli", noconsole=False)
+        compile_pyinstaller(
+            "cypy-cli", 
+            noconsole=False, 
+            collect_dnd=False, 
+            extra_excludes=["cypy.gui", "customtkinter", "tkinterdnd2", "tkinter", "_tkinter"]
+        )
 
-        # Package them combined into one portable release
-        package_combined_release()
+        # Package CLI version into portable zip release
+        package_cli_release()
+
+        # Package GUI version (only on macOS/Linux, ignored on Windows)
+        package_gui_release()
         
         # Windows Installer Compatibility:
         # Copy cypy-cli.exe from dist/cypy-cli into dist/cypy-gui so setup.iss can package both together

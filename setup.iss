@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "CYPY Manga Translator"
-#define MyAppVersion "0.25.1.11"
+#define MyAppVersion "0.25.1.12"
 #define MyAppPublisher "indravoyager"
 #define MyAppURL "https://github.com/indravoyager/cypy"
 #define MyAppExeName "cypy-gui.exe"
@@ -16,8 +16,9 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={autopf}\CYPY
+DefaultDirName={localappdata}\Programs\CYPY
 DisableProgramGroupPage=yes
+PrivilegesRequired=lowest
 OutputDir=releases
 OutputBaseFilename=CyPy_win-x64_Setup_v{#MyAppVersion}
 SetupIconFile=assets\favicon.ico

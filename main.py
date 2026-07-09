@@ -14,7 +14,17 @@ def log_crash(tb_text):
             f.write("====================\n")
             f.write(tb_text)
     except Exception:
-        pass
+        # Fallback to LOCALAPPDATA
+        try:
+            import os
+            appdata = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "cypy")
+            os.makedirs(appdata, exist_ok=True)
+            with open(os.path.join(appdata, "cypy_crash.txt"), "w", encoding="utf-8") as f:
+                f.write("CYPY Start Crash Log\n")
+                f.write("====================\n")
+                f.write(tb_text)
+        except:
+            pass
 
     # On Android, try writing to public external app files directory which is easy to read
     try:

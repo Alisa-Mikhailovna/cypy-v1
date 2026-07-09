@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "CYPY Manga Translator"
-#define MyAppVersion "0.2508"
+#define MyAppVersion "0.25.1.11"
 #define MyAppPublisher "indravoyager"
 #define MyAppURL "https://github.com/indravoyager/cypy"
 #define MyAppExeName "cypy-gui.exe"

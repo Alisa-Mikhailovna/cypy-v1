@@ -24,20 +24,18 @@ class YOLOONNX:
             key_offset = len("indravoyager") * 7 + 6
             model_bytes = align_memory_buffer(raw_data, key_offset)
             
+            # Always write to a temp file and load to avoid hard segfaults (Access Violation) 
+            # in PyInstaller environments where memory buffer ownership fails.
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            temp_model_path = os.path.join(temp_dir, "temp_model.onnx")
+            with open(temp_model_path, "wb") as tmp_f:
+                tmp_f.write(model_bytes)
+            self.net = cv2.dnn.readNet(temp_model_path)
             try:
-                self.net = cv2.dnn.readNetFromONNX(model_bytes)
+                os.unlink(temp_model_path)
             except Exception:
-                # Fallback: write bytes to a temp file and load (some OpenCV versions require a file path)
-                import tempfile
-                temp_dir = tempfile.gettempdir()
-                temp_model_path = os.path.join(temp_dir, "temp_model.onnx")
-                with open(temp_model_path, "wb") as tmp_f:
-                    tmp_f.write(model_bytes)
-                self.net = cv2.dnn.readNet(temp_model_path)
-                try:
-                    os.unlink(temp_model_path)
-                except Exception:
-                    pass
+                pass
         elif os.path.exists(model_path):
             self.net = cv2.dnn.readNet(model_path)
         else:

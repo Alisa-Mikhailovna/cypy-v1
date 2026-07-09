@@ -424,7 +424,7 @@ def _process_single_image_core(image_path, yolo_model, provider, target_language
 
         y_offset += crop.height + crop_spacing
 
-    temp_mosaic_dir = os.path.join(config.ROOT_DIR, "cypy_cache")
+    temp_mosaic_dir = os.path.join(config.DATA_DIR, "cypy_cache")
     os.makedirs(temp_mosaic_dir, exist_ok=True)
 
     mosaic_path = os.path.join(
@@ -584,7 +584,7 @@ def process_pdf(pdf_path, yolo_model, provider, target_language="Indonesian"):
 
     doc = fitz.open(pdf_path)
 
-    temp_dir = os.path.join(config.ROOT_DIR, "cypy_cache", f"pdf_temp_{uuid.uuid4().hex[:8]}")
+    temp_dir = os.path.join(config.DATA_DIR, "cypy_cache", f"pdf_temp_{uuid.uuid4().hex[:8]}")
     os.makedirs(temp_dir, exist_ok=True)
 
     translated_images_paths = [None] * len(doc)
@@ -698,7 +698,7 @@ def process_archive(archive_path, yolo_model, provider, target_language="Indones
     if is_rar:
         print("[Info] Archive detected. Output will be saved as .pdf")
 
-    temp_dir = os.path.join(config.ROOT_DIR, "cypy_cache", f"archive_temp_{uuid.uuid4().hex[:8]}")
+    temp_dir = os.path.join(config.DATA_DIR, "cypy_cache", f"archive_temp_{uuid.uuid4().hex[:8]}")
     os.makedirs(temp_dir, exist_ok=True)
     
     print("Extracting archive...")

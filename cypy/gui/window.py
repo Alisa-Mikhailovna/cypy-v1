@@ -37,7 +37,8 @@ class CYPYWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         try:
             self.TkdndVersion = TkinterDnD._require(self)
         except Exception as e:
-            print(f"[!] Failed to initialize drag and drop: {e}")
+            try: print(f"[!] Failed to initialize drag and drop: {e}")
+            except: pass
             
         # Load folder icon
         self.ic_folder = None
@@ -74,6 +75,7 @@ class CYPYWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         self.configure(fg_color=COLOR_BG)
         
         self.yolo_model = None
+        self.yolo_loading_done = False
         self.translating = False
                 
         # Main layout structure (2 Column Layout)
@@ -87,8 +89,8 @@ class CYPYWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         
         # Stdout/Stderr Redirector setup
         self.log_queue = queue.Queue()
-        sys.stdout = QueueWriteDescriptor(self.log_queue.put)
-        sys.stderr = QueueWriteDescriptor(self.log_queue.put)
+        sys.stdout = QueueWriteDescriptor(self.log_queue.put, sys.__stdout__)
+        sys.stderr = QueueWriteDescriptor(self.log_queue.put, sys.__stderr__)
         
         # Start queue processing
         self.after(100, self.process_log_queue)
@@ -167,10 +169,10 @@ class CYPYWindow(ctk.CTk, TkinterDnD.DnDWrapper):
                 base_model_path, _ = os.path.splitext(config.MODEL_YOLO)
                 model_missing = not os.path.exists(config.MODEL_YOLO) and not os.path.exists(base_model_path + ".dat")
                 
-                if self.yolo_model is not None or model_missing:
+                if getattr(self, 'yolo_loading_done', False) or model_missing:
                     if value <= 1.0:
                         progress_loading.set(value)
-                        lbl_status.configure(text="Engine Ready!")
+                        lbl_status.configure(text="Engine Ready!" if self.yolo_model else "Engine Failed!")
                         splash.after(15, lambda: run_loading(value + 0.05))
                     else:
                         try:
@@ -541,6 +543,8 @@ class CYPYWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         except Exception as e:
             self.set_status('Error loading YOLO', "#ff3333")
             self.append_log(f"[!] Error loading YOLO model: {e}\n")
+        finally:
+            self.yolo_loading_done = True
 
     def open_file_selector(self, select_mode):
         if select_mode == 'folder':

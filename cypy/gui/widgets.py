@@ -12,12 +12,23 @@ COLOR_DARK_BTN = "#2b2b2b"    # Secondary buttons (FILE, FOLDER)
 COLOR_DARK_BTN_HOVER = "#3a3a3a"
 
 class QueueWriteDescriptor:
-    def __init__(self, queue_put):
+    def __init__(self, queue_put, original_stream=None):
         self.queue_put = queue_put
+        self.original_stream = original_stream
     def write(self, string):
         self.queue_put(string)
+        if self.original_stream:
+            try:
+                self.original_stream.write(string)
+                self.original_stream.flush()
+            except Exception:
+                pass
     def flush(self):
-        pass
+        if self.original_stream:
+            try:
+                self.original_stream.flush()
+            except Exception:
+                pass
 
 class RetroOptionMenu(ctk.CTkFrame):
     def __init__(self, master, values, command=None, height=26, font=("Consolas", 10), **kwargs):

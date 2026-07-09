@@ -22,7 +22,7 @@ import types
 FONT_JAPANESE = os.path.join(config.ASSETS_DIR, "KosugiMaru.ttf")
 
 # Directory to cache downloaded fonts
-FONT_CACHE_DIR = os.path.join(config.ROOT_DIR, "cypy_cache", "fonts")
+FONT_CACHE_DIR = os.path.join(config.DATA_DIR, "cypy_cache", "fonts")
 
 # The currently active target language (set by app.py before translation)
 _active_target_language = None
@@ -855,7 +855,7 @@ def simpan_debug_crop_filter(image_name, crop, box, alasan):
     if not config.SIMPAN_DEBUG_FILTER_SFX:
         return
 
-    debug_dir = os.path.join(config.ROOT_DIR, "cypy_cache", "debug_filter_sfx")
+    debug_dir = os.path.join(config.DATA_DIR, "cypy_cache", "debug_filter_sfx")
     os.makedirs(debug_dir, exist_ok=True)
 
     safe_name = os.path.basename(image_name).replace(".", "_")
@@ -1070,7 +1070,7 @@ def create_shortcut_if_first_run():
 
     base_path = os.path.dirname(sys.executable)
     local_app_data = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
-    cache_dir = os.path.join(local_app_data, "cypy", "cypy_cache")
+    cache_dir = os.path.join(config.DATA_DIR, "cypy_cache")
     os.makedirs(cache_dir, exist_ok=True)
     
     flag_file = os.path.join(cache_dir, ".shortcut_created")
